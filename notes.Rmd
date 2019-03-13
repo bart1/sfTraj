@@ -1,0 +1,95 @@
+---
+title: "Notes on design of trajectory class based on the sf package"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Here I gather some Ideas how a trajectory class based on sf could look like. This is based on the discussions with many others.
+
+# nested tibbles
+
+Frequently trajectories are grouped on two levels. Where one entity (animal, car) migh have been tracked multiple times either simultaniously by multiple sensors (GPS, Argos, direct observation). This corresponds to `trajectories::Tracks` consisting of `trajectories::Track`. Then multiple tracked entities could gathered into a collection of tracks. For example `trajectories::Tracks` grouped in `trajectories::TracksCollection` or `move::Move` grouped in `move::MoveStack`. One idea to capture this structure would be use nested tibbles, the advantage of this setup is that it is rather easy to capture auxilary information (e.g. sex of individuals, car model, properties of the observation sensor). This could look something like this where 4 tracks are simulated, each track has been observeed twice with a location error.
+
+```{r, echo=T}
+require(sf)
+dataSf <- do.call('rbind', replicate(4, {
+  n <- round(rgamma(1, 400))
+  # simulate brownian motion
+  df <-
+    data.frame(
+      TracksId = paste(sample(letters), collapse = ''),
+      time = Sys.time() + 1:n,
+      x = cumsum(rnorm(n)),
+      y = cumsum(rnorm(n))
+    )
+  # observe the track twice with a location error
+  withErr <- replicate(2, {
+    dfWithError <- df
+    dfWithError$x <- df$x + rnorm(nrow(df), sd = .1)
+    dfWithError$y <- df$y + rnorm(nrow(df), sd = .1)
+    dfWithError
+  }, simplify = F)
+  rbind(cbind(withErr[[1]], TrackId = 'tr1'),
+        cbind(withErr[[2]], TrackId = 'tr2'))
+}, simplify = F)) %>%
+  st_as_sf(coords = c('x', 'y'), crs = 28992)
+suppressMessages(require(tibble))
+suppressMessages(require(tidyr))
+suppressMessages(require(dplyr))
+suppressMessages(require(purrr))
+trajAsNestedTibble <-
+  dataSf %>% 
+  as_tibble() %>% 
+  nest(-TracksId,-TrackId, .key='Track') %>% 
+  mutate(Track = map(Track, ~st_as_sf(.x))) %>% nest(-TracksId, .key='Tracks')
+trajAsNestedTibble
+trajAsNestedTibble$Tracks[[1]]
+trajAsNestedTibble$Tracks[[1]]$Track[[1]] %>% head()
+suppressWarnings(trajAsNestedTibble %>% unnest %>% unnest %>% st_as_sf %>% plot)
+```
+
+One disadvantage of this structure is that it might note nessicarily obvious for users how to access all information. 
+
+# sf and nested tibbles
+
+`sf` does not work directly with nested tibbles. This means some usage of map is required
+
+```{r}
+# polygon to intersect
+subRegion<-st_sfc(st_polygon(list(cbind(c(10,0,0,10,10),
+                                        c(10,10,0,0,10)))),
+                  crs = 28992)
+# this does not work
+try(st_intersection(trajAsNestedTibble, subRegion))
+# this works 
+suppressWarnings(
+  trajIntersect<-trajAsNestedTibble %>% 
+    mutate(Tracks=map(Tracks, ~.x%>%  
+                        mutate(Track = map(Track, 
+                                           ~st_intersection(.x, subRegion))))))
+
+suppressWarnings(plot(trajIntersect %>% unnest %>% unnest %>%st_as_sf))
+```
+
+# Time data
+
+This is probably one of the main challenges. The clearest was to deal with this is probably to define a column like the `geometry` column of a Simple features collection. This is probably most easily defined based on the POSIXct. 
+
+
+# Printing
+
+To some extent printing can be inproved by improving the `tibble` printing function by defining `type_sum` functions usw (see https://cran.r-project.org/web/packages/tibble/vignettes/extending.html). This is easily done when class are implements. The bigger question is if and how to implement global summaries of track objects like the way `sf` prints bounding boxes and projections. 
+ 
+# Asserting properties of trajectory
+
+The usage of nested tibbles allows for a lot of freedom and there are not many restrictions. For example, each track could have its own projection, this might even be useful in some cases where one would prefer a locally flat projection for each track. But many algorithms require some assumption (e.g. regular in time, flat projection, ordered in time usw, no duplicate time). I think the preferable setup would be not to restict the class very much but rather let other function assert that the input if valid for specific algorithms. The `assertthat` package could be of help here in combination with a set of validation functions. Examples could be:
+
+- `is_regular_in_time`
+- `is_regular_in_space`, equal distance between observations
+- `is_longlat`
+- `has_no_duplicated_times`
+- `has_z`
+
+I think a few properties might be formally restricted as they are quite common among most tracking data I am aware of. The two that I directly imagine would be first that timestamps are ordered. Second might be that only `sf::POINT` as spatial features are considered. I am not 100% sure of the later one as I can see some value for other possible spatial features like `sf::MULTIPOINT` (for example for argos tracking data that has two alternative solutions) or maybe have the locations presented as error polygons instead of points. 
