@@ -14,6 +14,7 @@ Frequently trajectories are grouped on two levels. Where one entity (animal, car
 
 ```{r, echo=T}
 require(sf)
+set.seed(234)
 dataSf <- do.call('rbind', replicate(4, {
   n <- round(rgamma(1, 400))
   # simulate brownian motion
@@ -75,8 +76,7 @@ suppressWarnings(plot(trajIntersect %>% unnest %>% unnest %>%st_as_sf))
 
 # Time data
 
-This is probably one of the main challenges. The clearest was to deal with this is probably to define a column like the `geometry` column of a Simple features collection. This is probably most easily defined based on the POSIXct. 
-
+This is probably one of the main challenges. The clearest was to deal with this is probably to define a column like the `geometry` column of a Simple features collection. This is probably most easily defined based on the `POSIXct`. 
 
 # Printing
 
@@ -93,3 +93,7 @@ The usage of nested tibbles allows for a lot of freedom and there are not many r
 - `has_z`
 
 I think a few properties might be formally restricted as they are quite common among most tracking data I am aware of. The two that I directly imagine would be first that timestamps are ordered. Second might be that only `sf::POINT` as spatial features are considered. I am not 100% sure of the later one as I can see some value for other possible spatial features like `sf::MULTIPOINT` (for example for argos tracking data that has two alternative solutions) or maybe have the locations presented as error polygons instead of points. 
+
+# Convience functions
+
+It might be important to define some functions for rather common tasks. One example might be to switch between a point representation and a representation based on `sf::LINESTRING` and `lubridate::Interval` for each segment. This is for example useful for doing intersections with roads. Alternatively the whole object can be represented as a `sf::MULTILINESTRING`.

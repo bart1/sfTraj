@@ -17,6 +17,7 @@ require(sf)
     ## Linking to GEOS 3.6.2, GDAL 2.2.3, PROJ 4.9.3
 
 ``` r
+set.seed(234)
 dataSf <- do.call('rbind', replicate(4, {
   n <- round(rgamma(1, 400))
   # simulate brownian motion
@@ -53,10 +54,10 @@ trajAsNestedTibble
     ## # A tibble: 4 x 2
     ##   TracksId                   Tracks          
     ##   <fct>                      <list>          
-    ## 1 bueqvjythxwalgzmncodfkspir <tibble [2 × 2]>
-    ## 2 nilarfkxpmsyoegzcqjvbwhutd <tibble [2 × 2]>
-    ## 3 izpthqxmfebndjvrukloawsycg <tibble [2 × 2]>
-    ## 4 rymvghtsdxfjwequpczlanikbo <tibble [2 × 2]>
+    ## 1 atboupsfkjqizydwxhermlvgcn <tibble [2 × 2]>
+    ## 2 ajowmncbevxupzyhtsklqgfrid <tibble [2 × 2]>
+    ## 3 cptxjindfvuhekzlbmyrogwsaq <tibble [2 × 2]>
+    ## 4 xzbholrkivaqytjcndmespfgwu <tibble [2 × 2]>
 
 ``` r
 trajAsNestedTibble$Tracks[[1]]
@@ -65,8 +66,8 @@ trajAsNestedTibble$Tracks[[1]]
     ## # A tibble: 2 x 2
     ##   TrackId Track             
     ##   <fct>   <list>            
-    ## 1 tr1     <tibble [415 × 2]>
-    ## 2 tr2     <tibble [415 × 2]>
+    ## 1 tr1     <tibble [413 × 2]>
+    ## 2 tr2     <tibble [413 × 2]>
 
 ``` r
 trajAsNestedTibble$Tracks[[1]]$Track[[1]] %>% head()
@@ -75,18 +76,18 @@ trajAsNestedTibble$Tracks[[1]]$Track[[1]] %>% head()
     ## Simple feature collection with 6 features and 1 field
     ## geometry type:  POINT
     ## dimension:      XY
-    ## bbox:           xmin: 0.4335085 ymin: -3.365161 xmax: 1.213213 ymax: -1.39285
+    ## bbox:           xmin: 0.1528957 ymin: -3.825114 xmax: 1.320248 ymax: 0.1895521
     ## epsg (SRID):    28992
     ## proj4string:    +proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.2369,50.0087,465.658,-0.406857,0.350733,-1.87035,4.0812 +units=m +no_defs
     ## # A tibble: 6 x 2
     ##   time                             geometry
     ##   <dttm>                        <POINT [m]>
-    ## 1 2019-03-13 14:42:06   (0.518603 -1.39285)
-    ## 2 2019-03-13 14:42:07 (0.6133364 -1.623702)
-    ## 3 2019-03-13 14:42:08   (1.213213 -2.16036)
-    ## 4 2019-03-13 14:42:09 (0.4335085 -3.365161)
-    ## 5 2019-03-13 14:42:10  (1.011515 -2.561027)
-    ## 6 2019-03-13 14:42:11  (0.9773563 -2.63912)
+    ## 1 2019-03-13 15:06:23   (1.08787 0.1895521)
+    ## 2 2019-03-13 15:06:24 (1.320248 -0.6341597)
+    ## 3 2019-03-13 15:06:25 (0.1528957 -1.186416)
+    ## 4 2019-03-13 15:06:26 (0.5223393 -1.356707)
+    ## 5 2019-03-13 15:06:27 (0.9232716 -3.825114)
+    ## 6 2019-03-13 15:06:28 (0.9884466 -2.443839)
 
 ``` r
 suppressWarnings(trajAsNestedTibble %>% unnest %>% unnest %>% st_as_sf %>% plot)
@@ -129,7 +130,7 @@ suppressWarnings(plot(trajIntersect %>% unnest %>% unnest %>%st_as_sf))
 Time data
 =========
 
-This is probably one of the main challenges. The clearest was to deal with this is probably to define a column like the `geometry` column of a Simple features collection. This is probably most easily defined based on the POSIXct.
+This is probably one of the main challenges. The clearest was to deal with this is probably to define a column like the `geometry` column of a Simple features collection. This is probably most easily defined based on the `POSIXct`.
 
 Printing
 ========
@@ -148,3 +149,8 @@ The usage of nested tibbles allows for a lot of freedom and there are not many r
 -   `has_z`
 
 I think a few properties might be formally restricted as they are quite common among most tracking data I am aware of. The two that I directly imagine would be first that timestamps are ordered. Second might be that only `sf::POINT` as spatial features are considered. I am not 100% sure of the later one as I can see some value for other possible spatial features like `sf::MULTIPOINT` (for example for argos tracking data that has two alternative solutions) or maybe have the locations presented as error polygons instead of points.
+
+Convience functions
+===================
+
+It might be important to define some functions for rather common tasks. One example might be to switch between a point representation and a representation based on `sf::LINESTRING` and `lubridate::Interval` for each segment. This is for example useful for doing intersections with roads. Alternatively the whole object can be represented as a `sf::MULTILINESTRING`.
